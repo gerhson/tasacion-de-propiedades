@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tasador ACM — Cuneo</title>
+  <meta name="description" content="Estimador de valor inmobiliario tipo ACM. Calcula valor y rango por m² con ajuste por edad, dormitorios y distrito." />
+  <style>
+    :root{--accent:#0f766e;--accent2:#0b5f57;--bg:#f6faf9;--ink:#0f172a;--muted:#6b7280;--card:#ffffff}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:1000px;margin:28px auto;padding:18px}
+    header{display:flex;gap:14px;align-items:center}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800}
+    h1{margin:0;font-size:22px}
+    p.lead{margin:4px 0 0 0;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:18px}
+    .card{background:var(--card);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+    label{font-weight:600;font-size:13px;display:block;margin-bottom:6px}
+    input, select, textarea{width:100%;padding:10px;border:1px solid #e6eef0;border-radius:10px;font-size:14px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .cta{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 16px;font-weight:800;cursor:pointer}
+    .muted{color:var(--muted)}
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    .kpi .box{background:#f2fbf9;border:1px solid #d9f2ec;border-radius:12px;padding:12px}
+    .kpi .box h3{margin:0 0 4px 0;font-size:14px}
+    .kpi .box .val{font-size:18px;font-weight:800}
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:12px}
+    .bad{color:#b91c1c}
+    .good{color:#065f46}
+    @media(min-width:900px){.grid{grid-template-columns:1.1fr .9fr}}
+    details summary{cursor:pointer;font-weight:700}
+    .small{font-size:12px}
+    .pill{background:#eef7f6;color:#0b5f57;padding:6px 8px;border-radius:999px;font-weight:700;display:inline-block}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">C</div>
+      <div>
+        <h1>Análisis Comparativo de Mercado (ACM) — Estimador</h1>
+        <p class="lead">Ingresa los datos del inmueble y obtén el <strong>valor estimado</strong> con rango inferior/superior y precio por m².</p>
+        <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+          <span class="pill">Demo original — no copia código de terceros</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Panel izquierdo: resultados -->
+      <section class="card">
+        <h2 style="margin:0 0 6px 0">Resultado de Tasación</h2>
+        <div id="summary" class="muted small">Completa el formulario para calcular…</div>
+
+        <div class="kpi" style="margin-top:8px">
+          <div class="box">
+            <h3>Rango inferior</h3>
+            <div id="kLow" class="val">—</div>
+            <div id="kLowM2" class="small muted">— / m²</div>
+          </div>
+          <div class="box">
+            <h3>Valor estimado</h3>
+            <div id="kMid" class="val">—</div>
+            <div id="kMidM2" class="small muted">— / m²</div>
+          </div>
+          <div class="box">
+            <h3>Rango superior</h3>
+            <div id="kHigh" class="val">—</div>
+            <div id="kHighM2" class="small muted">— / m²</div>
+          </div>
+        </div>
+
+        <details style="margin-top:12px">
+          <summary>¿Cómo calculamos?</summary>
+          <p class="small">Partimos de un <strong>precio base por m² del distrito</strong>, luego aplicamos <strong>ajustes</strong> por edad, dormitorios y estado. El <em>margen de error</em> define el rango ±% sobre el valor estimado.</p>
+          <ul class="small">
+            <li>Edad: −0.5% por año (máx. −15%).</li>
+            <li>Dormitorios: +2% por cada dormitorio por encima de 2 (máx. +6%).</li>
+            <li>Estado: excelente +5%, regular 0%, a remodelar −7%.</li>
+          </ul>
+        </details>
+
+        <hr style="margin:14px 0;border:none;border-top:1px solid #eef3f4"/>
+        <form id="lead" class="small">
+          <div class="row">
+            <div>
+              <label>Tu nombre</label>
+              <input name="lead_name" placeholder="Nombre y apellido"/>
+            </div>
+            <div>
+              <label>WhatsApp / Email</label>
+              <input name="lead_contact" placeholder="9xx xxx xxx o correo"/>
+            </div>
+          </div>
+          <input type="hidden" name="calc_payload" id="calc_payload"/>
+          <button type="submit" class="cta" style="margin-top:10px">📩 Solicitar informe PDF</button>
+          <div id="leadMsg" class="small muted" style="margin-top:6px">(Configura tu endpoint para recibir el informe)</div>
+        </form>
+      </section>
+
+      <!-- Panel derecho: formulario de cálculo -->
+      <aside class="card">
+        <form id="calc">
+          <h2 style="margin:0 0 8px 0">Datos del inmueble</h2>
+
+          <label>Dirección</label>
+          <input id="direccion" placeholder="Calle, distrito"/>
+
+          <div class="row">
+            <div>
+              <label>Distrito</label>
+              <select id="distrito">
+                <option value="SURCO">Santiago de Surco</option>
+                <option value="MIRAFLORES">Miraflores</option>
+                <option value="SAN_ISIDRO">San Isidro</option>
+                <option value="LA_MOLINA">La Molina</option>
+                <option value="OTRO">Otro (base genérica)</option>
+              </select>
+            </div>
+            <div>
+              <label>Área (m²)</label>
+              <input id="area" type="number" min="10" value="75" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Dormitorios</label>
+              <input id="beds" type="number" min="1" value="3" />
+            </div>
+            <div>
+              <label>Antigüedad (años)</label>
+              <input id="age" type="number" min="0" value="17" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Estado</label>
+              <select id="cond">
+                <option value="EXC">Excelente</option>
+                <option value="REG" selected>Regular</option>
+                <option value="REM">A remodelar</option>
+              </select>
+            </div>
+            <div>
+              <label>Margen de error (±%)</label>
+              <input id="err" type="number" min="5" max="35" value="25" />
+            </div>
+          </div>
+
+          <button type="submit" class="cta" style="margin-top:12px">🔍 Calcular valor</button>
+          <div id="calcMsg" class="small muted" style="margin-top:8px">Tip: ajusta el margen según cantidad/calidad de comparables.</div>
+        </form>
+      </aside>
+    </main>
+
+    <footer>
+      <p>© Cuneo & Asociados · Demo ACM original. Para producción, conecta tu propio endpoint (Formspree/Zapier) y tabla real de comparables.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Tabla base de precios por m² (USD) — editable por ti.
+    // Valores iniciales calibrados para replicar el ejemplo de Surco ~ USD 1,189/m² (75 m² → ~89,167 USD)
+    const BASE_PM2 = {
+      SURCO: 1189,
+      MIRAFLORES: 2500,
+      SAN_ISIDRO: 3000,
+      LA_MOLINA: 2000,
+      OTRO: 1200
+    };
+
+    // Ajustes porcentuales
+    function ageAdj(age){
+      const pct = Math.min(age * 0.5, 15); // 0.5% por año, tope 15%
+      return 1 - pct/100;
+    }
+    function bedAdj(beds){
+      const extra = Math.max(0, beds - 2); // sobre 2 dorm
+      const pct = Math.min(extra * 2, 6); // +2% c/u, tope 6%
+      return 1 + pct/100;
+    }
+    function condAdj(code){
+      if(code==='EXC') return 1.05;
+      if(code==='REM') return 0.93;
+      return 1.00; // REG
+    }
+
+    function fmt(n){
+      return new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(n);
+    }
+    function fmt2(n){
+      return new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(n);
+    }
+
+    const $ = (id)=>document.getElementById(id);
+
+    function compute(){
+      const dist = document.getElementById('distrito').value;
+      const area = parseFloat(document.getElementById('area').value||0);
+      const beds = parseInt(document.getElementById('beds').value||0);
+      const age = parseInt(document.getElementById('age').value||0);
+      const cond = document.getElementById('cond').value;
+      const err = Math.max(5, Math.min(35, parseFloat(document.getElementById('err').value||25)));
+      const dir = document.getElementById('direccion').value.trim();
+
+      const basePm2 = BASE_PM2[dist] || BASE_PM2.OTRO;
+      const adjPm2 = basePm2 * ageAdj(age) * bedAdj(beds) * condAdj(cond);
+      const mid = adjPm2 * area;
+      const low = mid * (1 - err/100);
+      const high = mid * (1 + err/100);
+
+      // por m2
+      const lowM2 = adjPm2 * (1 - err/100);
+      const highM2 = adjPm2 * (1 + err/100);
+
+      document.getElementById('kLow').textContent = 'USD ' + fmt(low);
+      document.getElementById('kMid').textContent = 'USD ' + fmt(mid);
+      document.getElementById('kHigh').textContent = 'USD ' + fmt(high);
+      document.getElementById('kLowM2').textContent = 'USD ' + fmt2(lowM2) + ' / m²';
+      document.getElementById('kMidM2').textContent = 'USD ' + fmt2(adjPm2) + ' / m²';
+      document.getElementById('kHighM2').textContent = 'USD ' + fmt2(highM2) + ' / m²';
+
+      const sum = document.getElementById('summary');
+      const parts = [];
+      if(dir) parts.push(dir);
+      parts.push(document.getElementById('distrito').selectedOptions[0].textContent);
+      parts.push(area + ' m²');
+      parts.push(beds + ' dorm');
+      parts.push(age + ' años');
+      sum.innerHTML = '<strong>Inmueble:</strong> ' + parts.join(' · ') +
+        ' — Margen ±' + err + '%.<br/><span class="small muted">Base m² distrito: USD ' + basePm2 + ' · Ajustado: USD ' + fmt2(adjPm2) + '/m²</span>';
+
+      // payload para Formspree/Zapier
+      const payload = {
+        direccion: dir,
+        distrito: dist,
+        area,
+        dormitorios: beds,
+        antiguedad: age,
+        estado: cond,
+        margen: err,
+        base_pm2: basePm2,
+        ajustado_pm2: Math.round(adjPm2),
+        rango_inferior: Math.round(low),
+        estimado: Math.round(mid),
+        rango_superior: Math.round(high)
+      };
+      document.getElementById('calc_payload').value = JSON.stringify(payload);
+      return payload;
+    }
+
+    document.getElementById('calc').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const p = compute();
+      document.getElementById('calcMsg').textContent = 'Cálculo actualizado. Puedes solicitar el PDF.';
+    });
+
+    // Lead form — Conecta Formspree: reemplaza ENDPOINT si quieres envío real
+    const FORM_ENDPOINT = '';// ej: 'https://formspree.io/f/xxxxx'
+    document.getElementById('lead').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const payload = compute(); // asegura último cálculo
+      const fd = new FormData(e.target);
+      fd.append('resultado_json', JSON.stringify(payload));
+
+      const leadMsg = document.getElementById('leadMsg');
+      if(!FORM_ENDPOINT){
+        leadMsg.innerHTML = 'Configura <code>FORM_ENDPOINT</code> para recibir el informe (Formspree/Zapier).';
+        return;
+      }
+      try{
+        const r = await fetch(FORM_ENDPOINT,{method:'POST',body:fd});
+        if(r.ok){
+          leadMsg.innerHTML = '<span class="good">✅ Recibido. Te contactamos en 24h.</span>';
+          e.target.reset();
+        }else{
+          leadMsg.innerHTML = '<span class="bad">❌ Error al enviar. Revisa el endpoint.</span>';
+        }
+      }catch(err){
+        console.error(err);
+        leadMsg.innerHTML = '<span class="bad">❌ Hubo un problema de red.</span>';
+      }
+    });
+
+    // Cálculo inicial para vista demo
+    compute();
+  </script>
+</body>
+</html>
